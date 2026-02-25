@@ -1,49 +1,29 @@
 package com.gabriel.employeeapp
 
-import android.graphics.drawable.Drawable
 import android.os.Bundle
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.animateContentSize
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
-import com.gabriel.employeeapp.data.model.Employee
-import com.gabriel.employeeapp.ui.theme.EmployeeAppTheme
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import androidx.core.content.res.ResourcesCompat
+import com.gabriel.employeeapp.data.model.Task
+import com.gabriel.employeeapp.ui.theme.EmployeeAppTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -52,8 +32,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             EmployeeAppTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    EmployeeScreen(
-                        modifier = Modifier.padding((innerPadding))
+                    TaskScreen(
+                        modifier = Modifier.padding(innerPadding)
                     )
                 }
             }
@@ -61,87 +41,252 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EmployeeScreen(viewModel: EmployeeViewModel = viewModel(), modifier: Modifier) {
-    val Employees by viewModel.employees.collectAsState()
+fun TaskScreen(
+    viewModel: TaskViewModel = viewModel(),
+    modifier: Modifier = Modifier
+) {
+    val tasks by viewModel.tasks.collectAsState()
+    val currentScreen by viewModel.currentScreen.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
 
-    if(Employees.isEmpty()){
-        LoadingScreen()
-    } else {
-        EmployeeList(Employees = Employees, modifier)
-    }
-}
-
-
-
-@Composable
-fun EmployeeList(Employees: List<Employee>, modifier: Modifier) {
-    LazyColumn {
-        items(Employees) { Employee ->
-            EmployeeItem(employee = Employee)
+    Column(modifier = modifier.fillMaxSize()) {
+        errorMessage?.let { msg ->
+            Surface(
+                color = MaterialTheme.colorScheme.errorContainer,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(msg, color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.weight(1f))
+                    TextButton(onClick = { viewModel.clearError() }) { Text("Dismiss") }
+                }
+            }
+        }
+        when (val screen = currentScreen) {
+            TaskScreen.List -> {
+                TopAppBar(
+                    title = { Text("Tasks") },
+                    actions = {
+                        IconButton(onClick = { viewModel.showCreate() }) {
+                            Icon(Icons.Default.Add, contentDescription = "Add Task")
+                        }
+                    }
+                )
+                if (isLoading && tasks.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                } else {
+                    TaskList(tasks = tasks, onTaskClick = { viewModel.showDetail(it) })
+                }
+            }
+            is TaskScreen.Detail -> {
+                TopAppBar(
+                    title = { Text("Task Detail") },
+                    navigationIcon = {
+                        IconButton(onClick = { viewModel.showList() }) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { viewModel.showEdit(screen.task) }) {
+                            Icon(Icons.Default.Edit, contentDescription = "Edit")
+                        }
+                        IconButton(onClick = {
+                            viewModel.deleteTask(screen.task)
+                        }) {
+                            Icon(Icons.Default.Delete, contentDescription = "Delete")
+                        }
+                    }
+                )
+                TaskDetailContent(task = screen.task)
+            }
+            TaskScreen.Create -> {
+                TopAppBar(
+                    title = { Text("New Task") },
+                    navigationIcon = {
+                        IconButton(onClick = { viewModel.showList() }) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        }
+                    }
+                )
+                TaskFormScreen(
+                    initialTitle = "",
+                    initialDescription = "",
+                    onSubmit = { title, desc -> viewModel.createTask(title, desc) }
+                )
+            }
+            is TaskScreen.Edit -> {
+                TopAppBar(
+                    title = { Text("Edit Task") },
+                    navigationIcon = {
+                        IconButton(onClick = { viewModel.showList() }) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        }
+                    }
+                )
+                TaskFormScreen(
+                    initialTitle = screen.task.title,
+                    initialDescription = screen.task.description,
+                    onSubmit = { title, desc ->
+                        viewModel.updateTask(
+                            screen.task.copy(title = title, description = desc)
+                        )
+                    }
+                )
+            }
+        }
+        if (isLoading && tasks.isNotEmpty()) {
+            LinearProgressIndicator(
+                modifier = Modifier.fillMaxWidth()
+            )
         }
     }
 }
 
+@Composable
+fun TaskList(
+    tasks: List<Task>,
+    onTaskClick: (Task) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(tasks) { task ->
+            TaskListItem(
+                task = task,
+                onClick = { onTaskClick(task) }
+            )
+        }
+    }
+}
 
 @Composable
-fun EmployeeItem(employee: Employee) {
-    Row (Modifier.padding(all = 100.dp)) {
-        Image(
-            painter = painterResource(R.drawable.leo),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .size(100.dp)
-                .clip(CircleShape)
-                .border(3.5.dp, MaterialTheme.colorScheme.primary, CircleShape)
+fun TaskListItem(
+    task: Task,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Text(
+                text = task.title,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
             )
-        Spacer(modifier = Modifier.width(8.dp))
-        var isExpanded by remember { mutableStateOf(false) }
-        val surfaceColor by animateColorAsState(
-            if (isExpanded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
-        )
-        Column(modifier = Modifier.clickable{isExpanded = !isExpanded} ) {
-            Text (
-                text = employee.name,
-                color = MaterialTheme.colorScheme.secondary,
-                style = MaterialTheme. typography.titleSmall
-            )
-
             Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = task.description.ifEmpty { "No description" },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2
+            )
+        }
+    }
+}
 
-            Surface(
-                shape = MaterialTheme.shapes.medium,
-                shadowElevation = 1.dp,
-                color = surfaceColor,
-                modifier = Modifier.animateContentSize().padding(1.dp)
-            ) {
+@Composable
+fun TaskDetailContent(
+    task: Task,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
                 Text(
-                    text = employee.description,
-                    modifier = Modifier.padding(all = 4.dp),
-                    maxLines = if(isExpanded) Int.MAX_VALUE else 1,
-                    style = MaterialTheme.typography.bodyMedium
+                    text = "ID: ${task.id}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = task.title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = task.description.ifEmpty { "No description" },
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
         }
     }
-
-
 }
 
 @Composable
-fun LoadingScreen() {
-    Text("Loading...")
-}
+fun TaskFormScreen(
+    initialTitle: String,
+    initialDescription: String,
+    onSubmit: (String, String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var title by remember(initialTitle) { mutableStateOf(initialTitle) }
+    var description by remember(initialDescription) { mutableStateOf(initialDescription) }
 
-@Composable
-fun ErrorScreen(message: String) {
-    Text("Error: $message")
-}
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
+    Column(
         modifier = modifier
-    )
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
+        OutlinedTextField(
+            value = title,
+            onValueChange = { title = it },
+            label = { Text("Title") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        OutlinedTextField(
+            value = description,
+            onValueChange = { description = it },
+            label = { Text("Description") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(150.dp),
+            maxLines = 5
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+        Button(
+            onClick = {
+                if (title.isNotBlank()) {
+                    onSubmit(title.trim(), description.trim())
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = title.isNotBlank()
+        ) {
+            Text(if (initialTitle.isEmpty()) "Create Task" else "Update Task")
+        }
+    }
 }

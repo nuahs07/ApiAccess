@@ -1,0 +1,12 @@
+com\gabriel\emplms\transform\TransformEmployeeServiceImpl.class
+com\gabriel\emplms\entity\TaskData.class
+com\gabriel\emplms\transform\TransformTaskService.class
+com\gabriel\emplms\service\EmployeeService.class
+com\gabriel\emplms\entity\EmployeeData.class
+com\gabriel\emplms\repository\EmployeeDataRepository.class
+com\gabriel\emplms\repository\TaskDataRepository.class
+com\gabriel\emplms\transform\TransformTaskServiceImpl.class
+com\gabriel\emplms\model\Employee.class
+com\gabriel\emplms\transform\TransformEmployeeService.class
+com\gabriel\emplms\service\TaskService.class
+com\gabriel\emplms\model\Task.class

@@ -1,0 +1,5 @@
+com\gabriel\emplms\controller\EmployeeController.class
+com\gabriel\emplms\EmployeeMSApplication.class
+com\gabriel\emplms\controller\TaskController.class
+com\gabriel\emplms\serviceimpl\EmployeeServiceImpl.class
+com\gabriel\emplms\serviceimpl\TaskServiceImpl.class
